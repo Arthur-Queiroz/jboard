@@ -14,6 +14,10 @@
 # Mapa de portas da VPS (ver dev-notes/deploy-kvm2-hostinger-cloudflared):
 # 5678 n8n · 8080 Evolution(antiga) · 8081 jpad · 8082/8443 jblog · 8084 jboard.
 
+# Nome do projeto (containers/volumes jboard_*), seguindo a convenção da VPS —
+# senão o Compose usaria o nome do diretório ("infra").
+name: jboard
+
 services:
   postgres:
     image: postgres:16
