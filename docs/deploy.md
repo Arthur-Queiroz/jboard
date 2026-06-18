@@ -8,7 +8,7 @@ deploy **manual**; o CI/CD via GitHub Actions vem por cima depois.
 ## Arquitetura
 
 ```
-Internet → Cloudflare Edge → Tunnel (cloudflared) → 127.0.0.1:8083 → Caddy (web)
+Internet → Cloudflare Edge → Tunnel (cloudflared) → 127.0.0.1:8084 → Caddy (web)
                                                                        ├─ /api/* → backend:8080 (Go)
                                                                        └─ /*     → SPA estático (Vue dist)
 backend → postgres (dedicado) · evolution-api → postgres(db evolution) + redis
@@ -16,11 +16,11 @@ backend → postgres (dedicado) · evolution-api → postgres(db evolution) + re
 
 **Subdomínio único** `jboard.devarthur.com.br`: o Caddy serve o SPA e faz
 `reverse_proxy` de `/api` pro backend na **mesma origem** — sem CORS. Só o
-serviço `web` abre porta, e no loopback (`127.0.0.1:8083`); Postgres, Redis,
+serviço `web` abre porta, e no loopback (`127.0.0.1:8084`); Postgres, Redis,
 backend e Evolution só existem na rede interna do compose.
 
 > Mapa de portas da VPS: 5678 n8n · 8080 Evolution(antiga) · 8081 jpad ·
-> 8082/8443 jblog · **8083 jboard** · 8084 jboard-evolution (só setup).
+> 8082/8443 jblog · **8084 jboard** · 8085 jboard-evolution (só setup).
 
 ## Pré-requisitos na VPS (uma vez)
 
@@ -71,26 +71,26 @@ docker compose -f infra/docker-compose.prod.yml ps
 Validar local (na VPS):
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8083/api/health   # 200
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8083/             # 200 (SPA)
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8084/api/health   # 200
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8084/             # 200 (SPA)
 ```
 
 ### 4. Conectar o WhatsApp (Evolution API)
 
-A Evolution sobe na `127.0.0.1:8084` (loopback, só setup). Criar a instância e
-escanear o QR — da própria VPS ou via túnel SSH (`ssh -L 8084:127.0.0.1:8084 root@2.25.158.85`):
+A Evolution sobe na `127.0.0.1:8085` (loopback, só setup). Criar a instância e
+escanear o QR — da própria VPS ou via túnel SSH (`ssh -L 8085:127.0.0.1:8085 root@2.25.158.85`):
 
 ```bash
 API_KEY=$(grep JBOARD_EVOLUTION_API_KEY /opt/jboard/infra/.env | cut -d= -f2)
-curl -s -X POST http://127.0.0.1:8084/instance/create \
+curl -s -X POST http://127.0.0.1:8085/instance/create \
   -H "Content-Type: application/json" -H "apikey: $API_KEY" \
   -d '{"instanceName":"jboard","qrcode":true}'
 # A resposta traz o base64 do QR. Reusar infra/setup-evolution.sh (aponta pra :8081
-# em dev; em prod troque EVO_URL pra http://127.0.0.1:8084) ou os scripts fetch-qr.py.
+# em dev; em prod troque EVO_URL pra http://127.0.0.1:8085) ou os scripts fetch-qr.py.
 ```
 
 Escanear: WhatsApp → Aparelhos conectados → Conectar aparelho. Status `open` =
-conectado. Depois de conectado, o mapeamento `8084` pode ser removido do compose
+conectado. Depois de conectado, o mapeamento `8085` pode ser removido do compose
 (o backend fala com a Evolution pela rede interna `evolution-api:8080`).
 
 ### 5. Rota do Cloudflare Tunnel
@@ -100,7 +100,7 @@ costuma ser `/etc/cloudflared/config.yml`). Adicionar **antes** do catch-all `40
 
 ```yaml
   - hostname: jboard.devarthur.com.br
-    service: http://localhost:8083
+    service: http://localhost:8084
   - service: http_status:404   # SEMPRE por último
 ```
 
@@ -138,7 +138,7 @@ docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d --bu
 
 ## Armadilhas
 
-- **Porta 8083 livre?** Conferir o mapa de portas — colisão derruba o bind.
+- **Porta 8084 livre?** Conferir o mapa de portas — colisão derruba o bind.
 - **`/api` 502 atrás do Caddy:** backend não subiu ou DB não migrou. Ver
   `docker compose ... logs backend`.
 - **Postgres exposto:** não há porta no host de propósito. Pra inspecionar,

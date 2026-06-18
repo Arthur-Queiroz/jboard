@@ -67,7 +67,7 @@ Rode `gofmt`, `go vet` e `npm run build` antes de finalizar qualquer alteração
   em `icons/` (quadrado azul com "j"), gerados via `npx tauri icon`.
 - `infra/docker-compose.yml` — stack de DEV (postgres + redis + backend + evolution-api).
 - `infra/docker-compose.prod.yml` — stack de PRODUÇÃO: sem portas no host (só
-  `web` em `127.0.0.1:8083`), segredos via `infra/.env`, serviço `web` (Caddy)
+  `web` em `127.0.0.1:8084`), segredos via `infra/.env`, serviço `web` (Caddy)
   buildando o SPA + proxy `/api`.
 - `infra/Dockerfile.web` — builda o Vue e serve dist/ + `reverse_proxy /api` (Caddy).
 - `infra/Caddyfile` — front-door único: SPA estático + `/api/* → backend:8080`.
@@ -142,7 +142,7 @@ múltiplas instâncias do backend.
   cd frontend && npm run tauri:build    # release
   cd frontend && npm run tauri:dev      # dev (abre janela + hot reload Vue)
   ```
-- **Deploy.** Ingress só via Cloudflare Tunnel → `web` (Caddy) em `127.0.0.1:8083`.
+- **Deploy.** Ingress só via Cloudflare Tunnel → `web` (Caddy) em `127.0.0.1:8084`.
   Não abrir portas na VPS: no `docker-compose.prod.yml` só o `web` bind (loopback);
   postgres/redis/backend/evolution ficam na rede interna. Subir com
   `docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d --build`.

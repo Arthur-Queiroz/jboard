@@ -2,17 +2,17 @@
 #
 # Diferenças vs docker-compose.yml (dev):
 #  - Nenhum serviço expõe porta direto na internet. Só o `web` (Caddy) abre uma
-#    porta, e mesmo assim no loopback (127.0.0.1:8083) — só o cloudflared, que
+#    porta, e mesmo assim no loopback (127.0.0.1:8084) — só o cloudflared, que
 #    roda na própria VPS, a alcança. Postgres/Redis/backend/evolution ficam
 #    acessíveis apenas pela rede interna do compose.
 #  - Segredos vêm do infra/.env (não há defaults inseguros tipo "jboard").
 #  - `web` builda o Vue e serve o SPA + proxy /api na mesma origem (Caddy).
 #
-# Deploy: cloudflared roteia jboard.devarthur.com.br -> http://localhost:8083.
+# Deploy: cloudflared roteia jboard.devarthur.com.br -> http://localhost:8084.
 # Subir:  docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d --build
 #
 # Mapa de portas da VPS (ver dev-notes/deploy-kvm2-hostinger-cloudflared):
-# 5678 n8n · 8080 Evolution(antiga) · 8081 jpad · 8082/8443 jblog · 8083 jboard.
+# 5678 n8n · 8080 Evolution(antiga) · 8081 jpad · 8082/8443 jblog · 8084 jboard.
 
 services:
   postgres:
@@ -64,7 +64,7 @@ services:
         VITE_JBOARD_API_TOKEN: ${JBOARD_API_TOKEN:?defina JBOARD_API_TOKEN no infra/.env}
     ports:
       # Loopback só: o cloudflared (na VPS) alcança; a internet não.
-      - "127.0.0.1:8083:80"
+      - "127.0.0.1:8084:80"
     depends_on:
       - backend
     restart: unless-stopped
@@ -74,7 +74,7 @@ services:
     environment:
       # URL pública só importa pra links de mídia/webhook; o jboard só manda
       # texto. Apontada pro loopback de setup (QR). Ajuste se rotear um subdomínio.
-      SERVER_URL: http://localhost:8084
+      SERVER_URL: http://localhost:8085
       PORT: "8080"
       AUTHENTICATION_API_KEY: ${JBOARD_EVOLUTION_API_KEY:?defina JBOARD_EVOLUTION_API_KEY no infra/.env}
       LANGUAGE: pt-BR
@@ -99,7 +99,7 @@ services:
     ports:
       # Loopback só, e só pra setup (criar instância + escanear QR via SSH tunnel
       # ou na própria VPS). Pode remover após conectar o WhatsApp.
-      - "127.0.0.1:8084:8080"
+      - "127.0.0.1:8085:8080"
     depends_on:
       postgres:
         condition: service_healthy
