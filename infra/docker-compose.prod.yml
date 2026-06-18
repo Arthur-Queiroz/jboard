@@ -3,16 +3,20 @@
 # Diferenças vs docker-compose.yml (dev):
 #  - Nenhum serviço expõe porta direto na internet. Só o `web` (Caddy) abre uma
 #    porta, e mesmo assim no loopback (127.0.0.1:8084) — só o cloudflared, que
-#    roda na própria VPS, a alcança. Postgres/Redis/backend/evolution ficam
-#    acessíveis apenas pela rede interna do compose.
+#    roda na própria VPS, a alcança. Postgres e backend só na rede interna.
 #  - Segredos vêm do infra/.env (não há defaults inseguros tipo "jboard").
 #  - `web` builda o Vue e serve o SPA + proxy /api na mesma origem (Caddy).
+#  - WhatsApp: NÃO sobe Evolution dedicada. Reusa a Evolution compartilhada da
+#    VPS (instância `inspire`, já conectada ao número do dono), alcançada pela
+#    rede externa `n8n_inspiro_net`. A Evolution é só um gateway — não guarda
+#    dado do jboard —, então compartilhá-la não acopla nada de negócio.
 #
 # Deploy: cloudflared roteia jboard.devarthur.com.br -> http://localhost:8084.
 # Subir:  docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d --build
 #
 # Mapa de portas da VPS (ver dev-notes/deploy-kvm2-hostinger-cloudflared):
-# 5678 n8n · 8080 Evolution(antiga) · 8081 jpad · 8082/8443 jblog · 8084 jboard.
+# 5678 n8n · 8080 Evolution(compartilhada) · 8081 jpad · 8082/8443 jblog ·
+# 8083 jinitializr · 8084 jboard.
 
 # Nome do projeto (containers/volumes jboard_*), seguindo a convenção da VPS —
 # senão o Compose usaria o nome do diretório ("infra").
@@ -27,19 +31,11 @@ services:
       POSTGRES_DB: jboard
     volumes:
       - jboard_pgdata:/var/lib/postgresql/data
-      # Cria a database "evolution" no mesmo Postgres na primeira subida.
-      - ./init-evolution-db.sql:/docker-entrypoint-initdb.d/init-evolution-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jboard"]
       interval: 5s
       timeout: 3s
       retries: 10
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - jboard_redis:/data
     restart: unless-stopped
 
   backend:
@@ -48,12 +44,17 @@ services:
     environment:
       JBOARD_DB_HOST: postgres
       JBOARD_DB_PASSWORD: ${JBOARD_DB_PASSWORD:?defina JBOARD_DB_PASSWORD no infra/.env}
+      # Evolution COMPARTILHADA: alcançada pelo nome do container na rede
+      # externa n8n_inspiro_net. INSTANCE/API_KEY vêm da Evolution compartilhada.
       JBOARD_EVOLUTION_URL: http://evolution-api:8080
-      JBOARD_EVOLUTION_INSTANCE: ${JBOARD_EVOLUTION_INSTANCE:-jboard}
+      JBOARD_EVOLUTION_INSTANCE: ${JBOARD_EVOLUTION_INSTANCE:-inspire}
       JBOARD_EVOLUTION_API_KEY: ${JBOARD_EVOLUTION_API_KEY:?defina JBOARD_EVOLUTION_API_KEY no infra/.env}
       JBOARD_WHATSAPP_RECIPIENT: ${JBOARD_WHATSAPP_RECIPIENT:-}
       # Em produção o token NÃO pode ser vazio (vazio = auth desligada).
       JBOARD_API_TOKEN: ${JBOARD_API_TOKEN:?defina JBOARD_API_TOKEN no infra/.env}
+    networks:
+      - default
+      - evolution
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,45 +74,13 @@ services:
       - backend
     restart: unless-stopped
 
-  evolution-api:
-    image: evoapicloud/evolution-api:latest
-    environment:
-      # URL pública só importa pra links de mídia/webhook; o jboard só manda
-      # texto. Apontada pro loopback de setup (QR). Ajuste se rotear um subdomínio.
-      SERVER_URL: http://localhost:8085
-      PORT: "8080"
-      AUTHENTICATION_API_KEY: ${JBOARD_EVOLUTION_API_KEY:?defina JBOARD_EVOLUTION_API_KEY no infra/.env}
-      LANGUAGE: pt-BR
-      DEL_INSTANCE: "false"
-      CONFIG_SESSION_PHONE_CLIENT: jboard
-      CONFIG_SESSION_PHONE_NAME: Chrome
-      DATABASE_ENABLED: "true"
-      DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://jboard:${JBOARD_DB_PASSWORD}@postgres:5432/evolution
-      DATABASE_SAVE_DATA_INSTANCE: "true"
-      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
-      DATABASE_SAVE_MESSAGE_UPDATE: "false"
-      DATABASE_SAVE_DATA_CONTACTS: "false"
-      DATABASE_SAVE_DATA_CHATS: "false"
-      DATABASE_SAVE_DATA_LABELS: "false"
-      DATABASE_SAVE_DATA_HISTORIC: "false"
-      CACHE_REDIS_ENABLED: "true"
-      CACHE_REDIS_URI: redis://redis:6379/1
-      CACHE_REDIS_PREFIX_KEY: evolution
-    volumes:
-      - jboard_evolution_instances:/evolution/instances
-    ports:
-      # Loopback só, e só pra setup (criar instância + escanear QR via SSH tunnel
-      # ou na própria VPS). Pode remover após conectar o WhatsApp.
-      - "127.0.0.1:8085:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    restart: unless-stopped
+networks:
+  default:
+  # Rede da stack n8n/Evolution compartilhada (criada por /root/n8n). O backend
+  # entra nela pra falar com `evolution-api:8080` sem sair pra internet.
+  evolution:
+    name: n8n_inspiro_net
+    external: true
 
 volumes:
   jboard_pgdata:
-  jboard_redis:
-  jboard_evolution_instances:
