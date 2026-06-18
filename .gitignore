@@ -1,0 +1,28 @@
+# Go
+/backend/server
+/backend/server.exe
+*.test
+
+# Node / Vite
+/frontend/node_modules/
+/frontend/dist/
+
+# Tauri / Rust
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Payloads de teste/scratch da Evolution API (contêm dados pessoais, ex. group ID)
+/infra/test-msg.json
+/infra/create-payload.json
+/infra/headers.txt
+
+# OS / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,249 @@
+:root {
+  --bg: #0f1115;
+  --panel: #1b1f27;
+  --panel-2: #242a35;
+  --border: #2e3542;
+  --text: #e6e8ec;
+  --muted: #8a93a3;
+  --accent: #4f8cff;
+  --danger: #e0556b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+button:hover {
+  border-color: var(--accent);
+}
+button.danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+input,
+textarea {
+  font: inherit;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.topbar h1 {
+  font-size: 18px;
+  margin: 0;
+}
+.topbar .boards {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.board-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+}
+.board-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.subbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.subbar input {
+  flex: 0 0 auto;
+  min-width: 200px;
+}
+
+.content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.board {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-height: 100%;
+}
+
+.column {
+  width: 280px;
+  flex: 0 0 280px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+}
+.column header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.column header h3 {
+  margin: 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+.column header input {
+  width: 100%;
+}
+.column .cards {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* altura mínima pra soltar card numa coluna vazia */
+  min-height: 24px;
+}
+
+.card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: grab;
+}
+.card.sortable-ghost {
+  opacity: 0.4;
+}
+.card.sortable-chosen {
+  border-color: var(--accent);
+}
+.card .title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.card-title {
+  cursor: pointer;
+}
+.card-title:hover {
+  color: var(--accent);
+}
+.card .desc {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.card-actions button {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+.card textarea {
+  width: 100%;
+  margin-top: 6px;
+  resize: vertical;
+}
+.card input {
+  width: 100%;
+}
+.card .reminders {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.reminder-chip {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.reminder-chip.sent {
+  text-decoration: line-through;
+}
+
+.add-form {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+.add-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-column {
+  border-style: dashed;
+  background: transparent;
+  justify-content: flex-end;
+}
+
+.empty {
+  color: var(--muted);
+  padding: 24px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+  padding: 4px 16px;
+}
+
+.reminder-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+.reminder-form input,
+.reminder-form textarea {
+  width: 100%;
+}

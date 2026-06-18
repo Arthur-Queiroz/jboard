@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissões do jboard desktop: core + autostart + notification",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "autostart:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
+    "notification:default",
+    "notification:allow-notify"
+  ]
+}

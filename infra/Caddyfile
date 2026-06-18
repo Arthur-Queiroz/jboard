@@ -1,0 +1,23 @@
+# jboard — Caddy (front-door único)
+#
+# Subdomínio único: jboard.devarthur.com.br serve o SPA E a API na MESMA origem.
+# Isso evita CORS (o frontend chama /api/... relativo) e dispensa um segundo
+# subdomínio. O Cloudflare Tunnel entrega o tráfego em http://localhost:8083
+# (mapeado pelo compose) — o TLS termina no Cloudflare, então o Caddy fica em
+# HTTP puro na :80 dentro do container, sem ACME.
+
+:80 {
+	# API → backend Go. Tem que vir antes do file_server pra capturar /api/*.
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	# SPA estático: assets com hash + fallback de rota pro index.html.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	encode gzip
+}

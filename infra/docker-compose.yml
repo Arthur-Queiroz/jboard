@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: jboard
+      POSTGRES_PASSWORD: jboard
+      # Cria 2 databases: jboard (app) e evolution (Evolution API).
+      POSTGRES_DB: jboard
+    volumes:
+      - jboard_pgdata:/var/lib/postgresql/data
+      # Script de init: cria database pra Evolution API no mesmo Postgres.
+      - ./init-evolution-db.sql:/docker-entrypoint-initdb.d/init-evolution-db.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jboard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - jboard_redis:/data
+    # Sem porta no host: só a Evolution API precisa, pela rede do compose.
+
+  backend:
+    build:
+      context: ../backend
+    environment:
+      JBOARD_DB_HOST: postgres
+      JBOARD_DB_PASSWORD: jboard
+      JBOARD_EVOLUTION_URL: http://evolution-api:8080
+      JBOARD_EVOLUTION_INSTANCE: ${JBOARD_EVOLUTION_INSTANCE:-jboard}
+      JBOARD_EVOLUTION_API_KEY: ${JBOARD_EVOLUTION_API_KEY:-changeme}
+      JBOARD_WHATSAPP_RECIPIENT: ${JBOARD_WHATSAPP_RECIPIENT:-}
+      JBOARD_API_TOKEN: ${JBOARD_API_TOKEN:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    environment:
+      SERVER_URL: http://localhost:8081
+      PORT: "8080"
+      AUTHENTICATION_API_KEY: ${JBOARD_EVOLUTION_API_KEY:-changeme}
+      LANGUAGE: pt-BR
+      # Não deleta instância desconectada (importante: QR code expira, reconecta sozinho).
+      DEL_INSTANCE: "false"
+      # Nome exibido em "Aparelhos conectados" no WhatsApp do celular.
+      CONFIG_SESSION_PHONE_CLIENT: jboard
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      # Evolution API v2 precisa de Postgres (Prisma) + Redis (cache).
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://jboard:jboard@postgres:5432/evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/1
+      CACHE_REDIS_PREFIX_KEY: evolution
+    volumes:
+      - jboard_evolution_instances:/evolution/instances
+    # Porta exposta só pra setup (criar instância + escanear QR).
+    # Em produção, remover este mapeamento — o backend acessa via rede interna.
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  jboard_pgdata:
+  jboard_redis:
+  jboard_evolution_instances:

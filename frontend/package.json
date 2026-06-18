@@ -1,0 +1,28 @@
+{
+  "name": "jboard-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc -b --noEmit",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:icon": "tauri icon ../desktop/src-tauri/icons/app-icon.svg"
+  },
+  "dependencies": {
+    "vue": "^3.5.13",
+    "vue-draggable-plus": "^0.6.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/sortablejs": "^1.15.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.5",
+    "vue-tsc": "^2.2.0"
+  }
+}

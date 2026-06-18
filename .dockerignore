@@ -1,0 +1,21 @@
+# Build context da imagem web (context = raiz do repo). Mantém só frontend/ +
+# infra/Caddyfile; o backend builda do próprio context (backend/), então pode
+# ser ignorado aqui sem afetá-lo.
+backend/
+desktop/
+docs/
+
+# Generated / pesado
+**/node_modules
+**/dist
+**/target
+*.test
+.git/
+
+# Segredos / locais
+infra/.env
+infra/.env.*
+!infra/.env.example
+.DS_Store
+.idea/
+.vscode/
