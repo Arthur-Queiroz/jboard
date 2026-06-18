@@ -58,7 +58,9 @@ Redis voltaria a fazer sentido se o projeto crescesse pra múltiplas instâncias
 
 ## WhatsApp via Evolution API
 
-Mesma abordagem usada no projeto da Inspire Pilates: instância própria da Evolution API (Baileys), rodando na VPS junto com o backend. Como é uso pessoal, single-recipient, com intervalos de horas entre mensagens, o perfil de risco de ban é baixo — os padrões de detecção giram em torno de comportamento de spam/bulk, não desse uso. Vale considerar um número secundário pra essa automação se quiser eliminar qualquer risco residual pro número principal.
+Mesma abordagem usada no projeto da Inspire Pilates: Evolution API (Baileys) na VPS. Como é uso pessoal, single-recipient, com intervalos de horas entre mensagens, o perfil de risco de ban é baixo — os padrões de detecção giram em torno de comportamento de spam/bulk, não desse uso. Vale considerar um número secundário pra essa automação se quiser eliminar qualquer risco residual pro número principal.
+
+**Atualização (deploy real, 2026-06-18):** em produção o jboard NÃO sobe Evolution dedicada — reusa a instância `inspire` da Evolution compartilhada que já roda na VPS (projeto n8n), pela rede `n8n_inspiro_net`. A decisão original era por instância dedicada, mas a Evolution é só um gateway de WhatsApp (não guarda dado de negócio do jboard, que vive todo no Postgres dedicado), então compartilhar a instância já conectada evita um 2º aparelho/QR e containers redundantes, sem acoplar nada que dificulte a futura migração de VPS (basta repontar a URL). O Postgres segue dedicado. Em dev, o `docker-compose.yml` ainda sobe Evolution + Redis próprios.
 
 ## Tauri: Vue embutido no binário
 

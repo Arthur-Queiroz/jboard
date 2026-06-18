@@ -11,16 +11,23 @@ deploy **manual**; o CI/CD via GitHub Actions vem por cima depois.
 Internet → Cloudflare Edge → Tunnel (cloudflared) → 127.0.0.1:8084 → Caddy (web)
                                                                        ├─ /api/* → backend:8080 (Go)
                                                                        └─ /*     → SPA estático (Vue dist)
-backend → postgres (dedicado) · evolution-api → postgres(db evolution) + redis
+backend → postgres (dedicado)
+backend → evolution-api (COMPARTILHADA, instância `inspire`, via rede n8n_inspiro_net)
 ```
 
 **Subdomínio único** `jboard.devarthur.com.br`: o Caddy serve o SPA e faz
 `reverse_proxy` de `/api` pro backend na **mesma origem** — sem CORS. Só o
-serviço `web` abre porta, e no loopback (`127.0.0.1:8084`); Postgres, Redis,
-backend e Evolution só existem na rede interna do compose.
+serviço `web` abre porta, e no loopback (`127.0.0.1:8084`); Postgres e backend
+só existem na rede interna do compose.
 
-> Mapa de portas da VPS: 5678 n8n · 8080 Evolution(antiga) · 8081 jpad ·
-> 8082/8443 jblog · **8084 jboard** · 8085 jboard-evolution (só setup).
+**WhatsApp via Evolution compartilhada.** O jboard NÃO sobe Evolution própria:
+reusa a instância `inspire` da Evolution já rodando na VPS (projeto `n8n`, rede
+`n8n_inspiro_net`), que já está conectada ao número do dono. O backend entra
+nessa rede externa e fala com `evolution-api:8080`. A Evolution é só um gateway
+(sem dado de negócio do jboard), então não há acoplamento de dados.
+
+> Mapa de portas da VPS: 5678 n8n · 8080 Evolution(compartilhada) · 8081 jpad ·
+> 8082/8443 jblog · 8083 jinitializr · **8084 jboard**.
 
 ## Pré-requisitos na VPS (uma vez)
 
@@ -51,8 +58,11 @@ Editar `.env` com valores **reais** (todos obrigatórios em prod):
 
 ```bash
 JBOARD_DB_PASSWORD=$(openssl rand -hex 24)       # cole o valor gerado
-JBOARD_EVOLUTION_API_KEY=$(openssl rand -hex 16) # cole o valor gerado
-JBOARD_EVOLUTION_INSTANCE=jboard
+# Evolution COMPARTILHADA: use a API key e a instância da Evolution que já roda
+# na VPS (projeto n8n). Pegar a key: docker inspect evolution-api --format \
+#   '{{range .Config.Env}}{{println .}}{{end}}' | grep AUTHENTICATION_API_KEY
+JBOARD_EVOLUTION_API_KEY=<key-da-evolution-compartilhada>
+JBOARD_EVOLUTION_INSTANCE=inspire                 # instância já conectada
 JBOARD_WHATSAPP_RECIPIENT=55XXXXXXXXXXX           # ou o @g.us do grupo
 JBOARD_API_TOKEN=$(openssl rand -hex 32)          # cole o valor gerado
 ```
@@ -75,23 +85,28 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8084/api/health   # 20
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8084/             # 200 (SPA)
 ```
 
-### 4. Conectar o WhatsApp (Evolution API)
+### 4. WhatsApp (Evolution compartilhada)
 
-A Evolution sobe na `127.0.0.1:8085` (loopback, só setup). Criar a instância e
-escanear o QR — da própria VPS ou via túnel SSH (`ssh -L 8085:127.0.0.1:8085 root@2.25.158.85`):
+**Sem QR.** O jboard reusa a instância `inspire` da Evolution compartilhada, que
+já está conectada. O backend só precisa estar na rede `n8n_inspiro_net` (o
+compose.prod já declara essa rede como `external`) e ter no `.env` a API key +
+instância da Evolution compartilhada (passo 2).
+
+Confirme que a rede e a instância existem:
 
 ```bash
-API_KEY=$(grep JBOARD_EVOLUTION_API_KEY /opt/jboard/infra/.env | cut -d= -f2)
-curl -s -X POST http://127.0.0.1:8085/instance/create \
-  -H "Content-Type: application/json" -H "apikey: $API_KEY" \
-  -d '{"instanceName":"jboard","qrcode":true}'
-# A resposta traz o base64 do QR. Reusar infra/setup-evolution.sh (aponta pra :8081
-# em dev; em prod troque EVO_URL pra http://127.0.0.1:8085) ou os scripts fetch-qr.py.
+docker network ls | grep n8n_inspiro_net                      # a rede existe
+KEY=$(docker inspect evolution-api --format '{{range .Config.Env}}{{println .}}{{end}}' | grep AUTHENTICATION_API_KEY | cut -d= -f2)
+curl -s http://127.0.0.1:8080/instance/fetchInstances -H "apikey: $KEY" | grep -o '"name":"[^"]*"'   # deve listar "inspire"
 ```
 
-Escanear: WhatsApp → Aparelhos conectados → Conectar aparelho. Status `open` =
-conectado. Depois de conectado, o mapeamento `8085` pode ser removido do compose
-(o backend fala com a Evolution pela rede interna `evolution-api:8080`).
+Testar o envio de ponta a ponta: criar um lembrete com `reminder_at` ~70s no
+futuro (via `POST /api/cards/{id}/reminders`) e conferir que o scheduler marca
+`sent_at` e a mensagem chega no WhatsApp.
+
+> Se um dia quiser uma instância dedicada (isolar do n8n), o `docker-compose.yml`
+> de dev ainda traz Evolution + Redis próprios — basta portar esses serviços pro
+> compose.prod e escanear um QR novo.
 
 ### 5. Rota do Cloudflare Tunnel
 

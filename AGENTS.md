@@ -66,9 +66,10 @@ Rode `gofmt`, `go vet` e `npm run build` antes de finalizar qualquer alteração
   (inicia com o sistema) e plugin de notificação preparado. Ícones genéricos
   em `icons/` (quadrado azul com "j"), gerados via `npx tauri icon`.
 - `infra/docker-compose.yml` — stack de DEV (postgres + redis + backend + evolution-api).
-- `infra/docker-compose.prod.yml` — stack de PRODUÇÃO: sem portas no host (só
-  `web` em `127.0.0.1:8084`), segredos via `infra/.env`, serviço `web` (Caddy)
-  buildando o SPA + proxy `/api`.
+- `infra/docker-compose.prod.yml` — stack de PRODUÇÃO: só postgres + backend +
+  `web` (Caddy, `127.0.0.1:8084`, build do SPA + proxy `/api`); sem portas no
+  host fora do `web`; segredos via `infra/.env`. NÃO sobe Evolution própria —
+  reusa a compartilhada (instância `inspire`) via rede externa `n8n_inspiro_net`.
 - `infra/Dockerfile.web` — builda o Vue e serve dist/ + `reverse_proxy /api` (Caddy).
 - `infra/Caddyfile` — front-door único: SPA estático + `/api/* → backend:8080`.
 - `docs/architecture.md` — arquitetura (espelhar no Obsidian).
