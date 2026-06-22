@@ -1,7 +1,7 @@
 # jboard
 
 App pessoal de gestão (quadro kanban + lembretes via WhatsApp) pra substituir
-Notion/Trello. Backend Go (API REST + scheduler de lembretes), frontend Vue 3
+Notion/Trello. Backend Go 1.26 (API REST + scheduler de lembretes), frontend Vue 3
 (único código-fonte, dois builds: web e desktop Tauri), Postgres dedicado e
 Evolution API (WhatsApp). Deploy em VPS Hostinger KVM2 via Docker Compose
 (git pull + build na VPS) + Caddy + Cloudflare Tunnel — subdomínio único
@@ -10,12 +10,16 @@ Evolution API (WhatsApp). Deploy em VPS Hostinger KVM2 via Docker Compose
 ## Setup
 
 ```bash
-# Banco + backend + Evolution API locais
-docker compose -f infra/docker-compose.yml up -d
+# Infra (Postgres + Evolution API). Sobe só os serviços de dependência;
+# o backend e frontend rodam nativos fora do compose pra hot-reload.
+cp -n infra/.env.example infra/.env        # ajustar se necessário
+docker compose -f infra/docker-compose.yml up -d postgres redis evolution-api
 
 # Backend (Go) — http://localhost:8080
 cd backend
-JBOARD_DB_PASSWORD=jboard go run ./cmd/server
+JBOARD_DB_PASSWORD=jboard \
+JBOARD_EVOLUTION_URL=http://localhost:8081 \
+go run ./cmd/server
 
 # Frontend (Vue) — http://localhost:5173 (proxy /api -> :8080)
 cd frontend
@@ -31,7 +35,7 @@ cd backend
 gofmt -l .              # deve listar nada
 go vet ./...
 go build ./...
-go test ./...           # (suíte a escrever)
+go test ./...           # precisa do Docker rodando (testcontainers)
 
 # Frontend
 cd frontend
@@ -56,9 +60,11 @@ Rode `gofmt`, `go vet` e `npm run build` antes de finalizar qualquer alteração
   in-memory em `api_test.go`/`fake_test.go`.
 - `backend/internal/scheduler/` — ticker 1min: varre lembretes pendentes e dispara.
 - `backend/internal/whatsapp/` — client da Evolution API (`Sender` interface).
+- `backend/Dockerfile` — build do binário Go (CGO_ENABLED=0, distroless nonroot).
 - `frontend/src/` — Vue 3 + Vite + TS. `api.ts` é o client tipado (envia
   `Authorization: Bearer` se `VITE_JBOARD_API_TOKEN` definido em build); `App.vue`
   + `components/ColumnView.vue` montam o kanban com DnD (vue-draggable-plus).
+  `vite.config.ts` tem proxy `/api → localhost:8080` pra dev.
   O frontend de produção é buildado e servido pelo `infra/Dockerfile.web` (Caddy).
 - `desktop/src-tauri/` — shell Tauri (Rust). `tauri.conf.json` aponta
   `frontendDist` pra `../../frontend/dist` (UI embutida no binário).
@@ -70,6 +76,7 @@ Rode `gofmt`, `go vet` e `npm run build` antes de finalizar qualquer alteração
   `web` (Caddy, `127.0.0.1:8084`, build do SPA + proxy `/api`); sem portas no
   host fora do `web`; segredos via `infra/.env`. NÃO sobe Evolution própria —
   reusa a compartilhada (instância `inspire`) via rede externa `n8n_inspiro_net`.
+- `infra/.env` / `infra/.env.example` — variáveis de ambiente (DB, Evolution, API token).
 - `infra/Dockerfile.web` — builda o Vue e serve dist/ + `reverse_proxy /api` (Caddy).
 - `infra/Caddyfile` — front-door único: SPA estático + `/api/* → backend:8080`.
 - `docs/architecture.md` — arquitetura (espelhar no Obsidian).
@@ -92,7 +99,8 @@ embuta `frontend/dist` no binário (não aponta pra URL hospedada) — atualiza�
 de UI no desktop exigem rebuild do binário.
 
 **Sem Redis.** Single-user, instância única: cache/fila/pubsub/rate-limit não
-se justificam (ver `docs/architecture.md`). Voltam a fazer sentido só com
+se justificam (ver `docs/architecture.md`). O Redis no docker-compose de dev
+existe só pra Evolution API, não pra jboard. Voltam a fazer sentido só com
 múltiplas instâncias do backend.
 
 ## Code Standards
@@ -126,8 +134,8 @@ múltiplas instâncias do backend.
 - **Evolution API.** O client assume `POST {baseURL}/message/sendText/{instance}`
   com header `apikey`. Validar o formato exato contra a versão da instância.
 - **Ícones do Tauri.** Gerados com `npx tauri icon` a partir de
-  `desktop/src-tauri/icons/app-icon.png` (quadrado azul com "j"). Pra regerar
-  com um logo real: substitua o PNG e rode `npm run tauri:icon` no `frontend/`.
+  `desktop/src-tauri/icons/app-icon.svg` (quadrado azul com "j"). Pra regerar
+  com um logo real: substitua o SVG e rode `npm run tauri:icon` no `frontend/`.
 - **Deps de sistema do Tauri (Linux/WSL).** O `cargo build` em `src-tauri`
   precisa das libs GTK/webkit. Instalar uma única vez:
   ```
@@ -140,12 +148,23 @@ múltiplas instâncias do backend.
   o erro é só na linkagem das bindings de sistema.
 - **Build do desktop.** Após instalar as deps:
   ```
-  cd frontend && npm run tauri:build    # release
   cd frontend && npm run tauri:dev      # dev (abre janela + hot reload Vue)
+
+  # release apontando pro backend de produção (o webview empacotado não tem
+  # proxy nem backend na própria origem, então a API base precisa ser absoluta):
+  cd frontend && \
+    VITE_JBOARD_API_BASE=https://jboard.devarthur.com.br/api \
+    VITE_JBOARD_API_TOKEN=<token> \
+    npm run tauri:build
   ```
+  As `VITE_*` são lidas pelo `beforeBuildCommand` (`npm run build`) do
+  `tauri.conf.json`. Em `tauri:dev` a API base cai no default `/api` (proxy do
+  Vite → backend local). O backend precisa liberar a origem do webview em
+  `JBOARD_CORS_ORIGINS` (default já cobre `tauri://localhost` e
+  `http://tauri.localhost`).
 - **Deploy.** Ingress só via Cloudflare Tunnel → `web` (Caddy) em `127.0.0.1:8084`.
   Não abrir portas na VPS: no `docker-compose.prod.yml` só o `web` bind (loopback);
-  postgres/redis/backend/evolution ficam na rede interna. Subir com
+  postgres e backend ficam na rede interna. Subir com
   `docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d --build`.
   Runbook completo em `docs/deploy.md`.
 
