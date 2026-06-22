@@ -27,6 +27,10 @@ func (s *Server) createCard(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err)
 		return
 	}
+	// Garante reminders: [] no JSON (nil slice vira "null" no encoding/json,
+	// o que quebra o frontend que faz card.reminders.length). Card recém-criado
+	// não tem lembretes, então [] é fiel à realidade.
+	card.Reminders = []domain.Reminder{}
 	respondJSON(w, http.StatusCreated, card)
 }
 

@@ -176,6 +176,26 @@ func TestCreateCard_EmptyTitle_400(t *testing.T) {
 	}
 }
 
+// TestCreateCard_RemindersIsArray regression: o handler precisa devolver
+// reminders como [] (não null). nil slice em Go vira "null" no JSON, o que
+// quebra o frontend (card.reminders.length lança TypeError).
+func TestCreateCard_RemindersIsArray(t *testing.T) {
+	h, store := newTestServer(t)
+
+	column := &domain.Column{BoardID: 1, Title: "A fazer", Position: 0}
+	store.CreateColumn(context.Background(), column)
+
+	rec := doRequest(t, h, http.MethodPost, "/api/columns/"+utoa(column.ID)+"/cards",
+		map[string]any{"title": "X", "position": 0})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create card: %d (body=%s)", rec.Code, rec.Body.String())
+	}
+	card := decodeBody[domain.Card](t, rec)
+	if card.Reminders == nil {
+		t.Fatalf("reminders devolvido como null; esperado [] — body=%s", rec.Body.String())
+	}
+}
+
 // utoa evita importar strconv só pra converter uint pra string no path.
 func utoa(id uint) string {
 	if id == 0 {
