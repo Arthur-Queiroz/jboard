@@ -55,8 +55,30 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker compose -f infra/docker-compose.prod.yml build
 
+  # Scan de vulnerabilidades: govulncheck (só falha se o código chama a função
+  # vulnerável) + npm audit das deps de produção (falha em high/critical).
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          cd backend && govulncheck ./...
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm audit (prod deps)
+        run: cd frontend && npm audit --omit=dev --audit-level=high
+
   deploy:
-    needs: [ backend, frontend, build ]
+    needs: [ backend, frontend, build, security ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

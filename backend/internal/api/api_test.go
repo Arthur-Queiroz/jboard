@@ -242,6 +242,21 @@ func TestCORS_DisallowedOrigin(t *testing.T) {
 	}
 }
 
+// TestMaxBodyBytes_CorpoGigante400: body acima do limite faz o decode falhar → 400.
+func TestMaxBodyBytes_CorpoGigante400(t *testing.T) {
+	h, _ := newTestServer(t)
+
+	body := `{"title":"` + strings.Repeat("a", 2<<20) + `"}` // ~2 MB > limite de 1 MB
+	req := httptest.NewRequest(http.MethodPost, "/api/boards", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("corpo gigante: esperado 400, veio %d", rec.Code)
+	}
+}
+
 // utoa evita importar strconv só pra converter uint pra string no path.
 func utoa(id uint) string {
 	if id == 0 {

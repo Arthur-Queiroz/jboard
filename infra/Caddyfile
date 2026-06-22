@@ -7,6 +7,19 @@
 # HTTP puro na :80 dentro do container, sem ACME.
 
 :80 {
+	# Headers de segurança em todas as respostas. O TLS termina no Cloudflare,
+	# mas o tráfego até o browser é HTTPS, então o HSTS é honrado. A CSP é
+	# afrouxada só em style-src ('unsafe-inline') porque o drag injeta estilos
+	# via JS; script é estritamente 'self' (o build não tem script inline).
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+	}
+
 	# API → backend Go. Tem que vir antes do file_server pra capturar /api/*.
 	handle /api/* {
 		reverse_proxy backend:8080

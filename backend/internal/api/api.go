@@ -30,6 +30,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(maxBodyBytes(1 << 20)) // 1 MB: corpo JSON de board/card/reminder é pequeno
 	r.Use(s.corsMiddleware)
 	r.Use(s.authMiddleware)
 
@@ -69,6 +70,17 @@ func (s *Server) Router() http.Handler {
 	})
 
 	return r
+}
+
+// maxBodyBytes limita o tamanho do corpo de cada request (defesa contra payload
+// gigante consumindo memória). Ler além do limite faz o decode falhar → 400.
+func maxBodyBytes(n int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, n)
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
