@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "typecheck": "vue-tsc -b --noEmit",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:dev": "cd ../desktop && tauri dev",
+    "tauri:build": "cd ../desktop && tauri build",
     "tauri:icon": "tauri icon ../desktop/src-tauri/icons/app-icon.svg"
   },
   "dependencies": {

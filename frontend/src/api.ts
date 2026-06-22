@@ -46,7 +46,11 @@ export interface BoardSummary {
   updated_at: string
 }
 
-const BASE = '/api'
+// Base da API. Web e desktop-em-dev usam '/api' (proxy do Vite / mesma origem em
+// produção). O build do desktop empacotado define VITE_JBOARD_API_BASE com a URL
+// absoluta do backend (ex.: https://jboard.devarthur.com.br/api), já que o webview
+// não tem proxy nem backend na própria origem. Sem barra final.
+const BASE = import.meta.env.VITE_JBOARD_API_BASE ?? '/api'
 
 // Token de auth injetado em produção via Vite env (VITE_JBOARD_API_TOKEN).
 // Em dev local (token vazio no backend), fica undefined e o header não é enviado.
