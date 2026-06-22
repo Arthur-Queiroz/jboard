@@ -26,7 +26,10 @@ jobs:
         run: test -z "$(gofmt -l .)" || { echo "arquivos não formatados:"; gofmt -l .; exit 1; }
       - run: go vet ./...
       - run: go build ./...
-      - run: go test ./...   # testcontainers usa o Docker do runner (integração de DB)
+      - name: test + cobertura
+        run: |
+          go test ./... -coverprofile=coverage.out   # testcontainers usa o Docker do runner
+          go tool cover -func=coverage.out | tail -1  # imprime a cobertura total
 
   frontend:
     runs-on: ubuntu-latest

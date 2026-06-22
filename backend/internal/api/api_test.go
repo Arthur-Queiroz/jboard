@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Arthur-Queiroz/jboard/internal/domain"
 )
@@ -254,6 +255,97 @@ func TestMaxBodyBytes_CorpoGigante400(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("corpo gigante: esperado 400, veio %d", rec.Code)
+	}
+}
+
+// TestColumn_UpdateDelete: PUT (200, persiste título) e DELETE (204) de coluna.
+func TestColumn_UpdateDelete(t *testing.T) {
+	h, store := newTestServer(t)
+	col := &domain.Column{BoardID: 1, Title: "A", Position: 0}
+	store.CreateColumn(context.Background(), col)
+
+	rec := doRequest(t, h, http.MethodPut, "/api/columns/"+utoa(col.ID), map[string]any{"title": "B", "position": 1})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update column: %d", rec.Code)
+	}
+	if got := decodeBody[domain.Column](t, rec); got.Title != "B" {
+		t.Fatalf("título não atualizou: %+v", got)
+	}
+
+	rec = doRequest(t, h, http.MethodDelete, "/api/columns/"+utoa(col.ID), nil)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete column: %d", rec.Code)
+	}
+}
+
+// TestColumn_Update_NotFound: PUT em coluna inexistente → 404.
+func TestColumn_Update_NotFound(t *testing.T) {
+	h, _ := newTestServer(t)
+	rec := doRequest(t, h, http.MethodPut, "/api/columns/999", map[string]any{"title": "X"})
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("esperado 404, veio %d", rec.Code)
+	}
+}
+
+// TestReminder_CreateUsaDefaultRecipient: sem recipient no corpo, usa o padrão da
+// config; reminder novo nasce sem sent_at. Cobre também o DELETE.
+func TestReminder_CreateUsaDefaultRecipient(t *testing.T) {
+	store := newFakeStore()
+	h := (&Server{Boards: store, Columns: store, Cards: store, Reminders: store, DefaultRecipient: "5511888888888"}).Router()
+	card := &domain.Card{ColumnID: 1, Title: "c"}
+	store.CreateCard(context.Background(), card)
+
+	future := time.Now().Add(time.Hour).Format(time.RFC3339)
+	rec := doRequest(t, h, http.MethodPost, "/api/cards/"+utoa(card.ID)+"/reminders",
+		map[string]any{"reminder_at": future, "message": "oi"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create reminder: %d (body=%s)", rec.Code, rec.Body.String())
+	}
+	got := decodeBody[domain.Reminder](t, rec)
+	if got.Recipient != "5511888888888" {
+		t.Fatalf("esperado default recipient, veio %q", got.Recipient)
+	}
+	if got.SentAt != nil {
+		t.Fatal("reminder novo não deveria ter sent_at")
+	}
+
+	rec = doRequest(t, h, http.MethodDelete, "/api/reminders/"+utoa(got.ID), nil)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete reminder: %d", rec.Code)
+	}
+}
+
+// TestReminder_Create_PassadoRejeitado: reminder_at no passado → 400.
+func TestReminder_Create_PassadoRejeitado(t *testing.T) {
+	h, store := newTestServer(t)
+	card := &domain.Card{ColumnID: 1, Title: "c"}
+	store.CreateCard(context.Background(), card)
+
+	past := time.Now().Add(-time.Hour).Format(time.RFC3339)
+	rec := doRequest(t, h, http.MethodPost, "/api/cards/"+utoa(card.ID)+"/reminders",
+		map[string]any{"reminder_at": past, "message": "oi"})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("esperado 400 para reminder no passado, veio %d", rec.Code)
+	}
+}
+
+// TestBoard_UpdateDelete: update (200) e delete (204 + 404 depois) de board.
+func TestBoard_UpdateDelete(t *testing.T) {
+	h, store := newTestServer(t)
+	b := &domain.Board{Title: "A"}
+	store.CreateBoard(context.Background(), b)
+
+	rec := doRequest(t, h, http.MethodPut, "/api/boards/"+utoa(b.ID), map[string]any{"title": "B"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update board: %d", rec.Code)
+	}
+	rec = doRequest(t, h, http.MethodDelete, "/api/boards/"+utoa(b.ID), nil)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete board: %d", rec.Code)
+	}
+	rec = doRequest(t, h, http.MethodGet, "/api/boards/"+utoa(b.ID), nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("board deletado deveria dar 404, veio %d", rec.Code)
 	}
 }
 
