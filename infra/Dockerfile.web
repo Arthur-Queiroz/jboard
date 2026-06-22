@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
-# O token VITE_* é embutido de propósito no bundle do SPA (auth client-side,
-# não é segredo de servidor) — por isso pulamos a regra SecretsUsedInArgOrEnv.
-# check=skip=SecretsUsedInArgOrEnv;error=true
 #
 # Front-door de produção: builda o Vue e serve o dist/ + proxy /api via Caddy.
 # Context = raiz do repo (precisa de frontend/ e infra/Caddyfile). O .dockerignore
 # da raiz exclui backend/, desktop/, node_modules e dist pra não inflar o build.
+#
+# A web NÃO embute token: autentica por cookie de sessão (POST /api/login). O
+# token Bearer é só do desktop (build separado em frontend/).
 
 # Build stage: compila o Vue pra dist/ estático.
 FROM node:22-slim AS build
@@ -13,9 +13,6 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
-# O token de API é injetado em build-time (o SPA envia Authorization: Bearer).
-ARG VITE_JBOARD_API_TOKEN=""
-ENV VITE_JBOARD_API_TOKEN=$VITE_JBOARD_API_TOKEN
 RUN npm run build
 
 # Runtime: Caddy serve o dist/ e faz reverse_proxy de /api -> backend.

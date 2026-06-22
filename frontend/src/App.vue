@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { api, type Board, type BoardSummary } from './api'
+import { api, UnauthorizedError, type Board, type BoardSummary } from './api'
 import ColumnView from './components/ColumnView.vue'
 
 const boards = ref<BoardSummary[]>([])
@@ -11,12 +11,45 @@ const editingBoardTitle = ref('')
 const error = ref('')
 const loading = ref(false)
 
+// Login (web): quando a API responde 401, mostra a tela de senha.
+const needLogin = ref(false)
+const password = ref('')
+const loginError = ref('')
+const loggingIn = ref(false)
+
+async function doLogin() {
+  if (!password.value) return
+  loggingIn.value = true
+  loginError.value = ''
+  try {
+    await api.login(password.value)
+    needLogin.value = false
+    password.value = ''
+    await loadBoards()
+  } catch (e) {
+    loginError.value = e instanceof UnauthorizedError ? 'Senha incorreta.' : String(e)
+  } finally {
+    loggingIn.value = false
+  }
+}
+
+async function logout() {
+  await api.logout()
+  needLogin.value = true
+  selected.value = null
+  boards.value = []
+}
+
 async function loadBoards() {
   loading.value = true
   try {
     boards.value = await api.listBoards()
   } catch (e) {
-    error.value = String(e)
+    if (e instanceof UnauthorizedError) {
+      needLogin.value = true
+    } else {
+      error.value = String(e)
+    }
   } finally {
     loading.value = false
   }
@@ -94,7 +127,22 @@ onMounted(loadBoards)
 </script>
 
 <template>
-  <div class="app">
+  <div v-if="needLogin" class="login">
+    <form class="login-card" @submit.prevent="doLogin">
+      <h1>jboard</h1>
+      <input
+        v-model="password"
+        type="password"
+        placeholder="senha"
+        autofocus
+        autocomplete="current-password"
+      />
+      <button type="submit" :disabled="loggingIn">{{ loggingIn ? 'entrando…' : 'entrar' }}</button>
+      <p v-if="loginError" class="error">{{ loginError }}</p>
+    </form>
+  </div>
+
+  <div v-else class="app">
     <div class="topbar">
       <h1>jboard</h1>
       <div class="boards">
@@ -110,6 +158,7 @@ onMounted(loadBoards)
       </div>
       <input v-model="newBoardTitle" placeholder="novo quadro" @keyup.enter="addBoard" />
       <button @click="addBoard">+</button>
+      <button class="logout" @click="logout" title="sair">sair</button>
     </div>
 
     <div v-if="selected" class="subbar">

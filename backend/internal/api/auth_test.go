@@ -80,3 +80,77 @@ func TestAuth_HealthPublico(t *testing.T) {
 		t.Fatalf("health deveria ser público, veio %d", rec.Code)
 	}
 }
+
+// authServerComSenha monta um Server com Bearer e login por senha ligados.
+func authServerComSenha() http.Handler {
+	store := newFakeStore()
+	return (&Server{
+		Boards: store, Columns: store, Cards: store, Reminders: store,
+		APIToken: "segredo", AuthPassword: "minhasenha",
+	}).Router()
+}
+
+// TestLogin_OK_DefineCookie_EConcedeAcesso: senha certa devolve 200 + cookie de
+// sessão; uma request com esse cookie (sem Bearer) é autorizada.
+func TestLogin_OK_DefineCookie_EConcedeAcesso(t *testing.T) {
+	h := authServerComSenha()
+
+	rec := doRequest(t, h, http.MethodPost, "/api/login", map[string]string{"password": "minhasenha"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login: esperado 200, veio %d", rec.Code)
+	}
+	cookie := rec.Result().Cookies()
+	var session *http.Cookie
+	for _, c := range cookie {
+		if c.Name == sessionCookieName {
+			session = c
+		}
+	}
+	if session == nil || session.Value == "" {
+		t.Fatal("login deveria setar o cookie de sessão")
+	}
+	if !session.HttpOnly {
+		t.Fatal("cookie de sessão deveria ser HttpOnly")
+	}
+
+	// Agora acessa um recurso protegido só com o cookie (sem Bearer).
+	req := httptest.NewRequest(http.MethodGet, "/api/boards", nil)
+	req.AddCookie(session)
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("cookie de sessão deveria autorizar, veio %d", rec2.Code)
+	}
+}
+
+// TestLogin_SenhaErrada_401.
+func TestLogin_SenhaErrada_401(t *testing.T) {
+	h := authServerComSenha()
+	rec := doRequest(t, h, http.MethodPost, "/api/login", map[string]string{"password": "errada"})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("esperado 401 com senha errada, veio %d", rec.Code)
+	}
+	if len(rec.Result().Cookies()) != 0 {
+		t.Fatal("senha errada não deveria setar cookie")
+	}
+}
+
+// TestLogin_SemSenhaConfigurada_401: AuthPassword vazio → login indisponível.
+func TestLogin_SemSenhaConfigurada_401(t *testing.T) {
+	rec := doRequest(t, authServer(), http.MethodPost, "/api/login", map[string]string{"password": "qualquer"})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("esperado 401 sem senha configurada, veio %d", rec.Code)
+	}
+}
+
+// TestCookieInvalido_401: cookie de sessão forjado não autoriza.
+func TestCookieInvalido_401(t *testing.T) {
+	h := authServerComSenha()
+	req := httptest.NewRequest(http.MethodGet, "/api/boards", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "forjado.invalido"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("cookie forjado deveria dar 401, veio %d", rec.Code)
+	}
+}
