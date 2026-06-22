@@ -247,3 +247,7 @@ textarea {
 .reminder-form textarea {
   width: 100%;
 }
+.reminder-label {
+  font-size: 11px;
+  color: var(--muted);
+}

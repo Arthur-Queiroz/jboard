@@ -156,24 +156,26 @@ function formatReminder(iso: string): string {
             <button class="danger" @click="removeCard(card.id)">×</button>
           </div>
           <p v-if="card.description" class="desc" @click="startEditCard(card)">{{ card.description }}</p>
-          <div v-if="card.reminders.length" class="reminders">
+          <div v-if="card.reminders?.length" class="reminders">
             <span
               v-for="reminder in card.reminders"
               :key="reminder.id"
               class="reminder-chip"
               :class="{ sent: reminder.sent_at }"
+              :title="reminder.sent_at ? 'WhatsApp enviado' : 'WhatsApp agendado'"
             >
-              {{ formatReminder(reminder.reminder_at) }}
+              wa {{ formatReminder(reminder.reminder_at) }}
             </span>
           </div>
           <div class="card-actions">
             <button @click="startEditCard(card)">editar</button>
-            <button @click="toggleReminder(card.id)">lembrete</button>
+            <button @click="toggleReminder(card.id)">WhatsApp</button>
           </div>
           <div v-if="openReminderFor === card.id" class="reminder-form">
+            <label class="reminder-label">Enviar pelo WhatsApp em:</label>
             <input type="datetime-local" v-model="reminderAt" />
-            <textarea v-model="reminderMessage" placeholder="mensagem do lembrete" rows="2" />
-            <button @click="addReminder(card.id)">agendar</button>
+            <textarea v-model="reminderMessage" placeholder="mensagem do WhatsApp" rows="2" />
+            <button @click="addReminder(card.id)">agendar envio</button>
           </div>
         </template>
       </div>
