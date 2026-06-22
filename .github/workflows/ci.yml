@@ -44,6 +44,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run test    # vitest (api.ts + ColumnView.vue)
       - run: npm run build   # vue-tsc (typecheck) + vite build
 
   # Sanity dos Dockerfiles ANTES de deployar (o build real é na VPS). As envs são
