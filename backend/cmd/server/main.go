@@ -46,6 +46,7 @@ func main() {
 			Reminders:        store,
 			DefaultRecipient: cfg.WhatsAppRecipient,
 			APIToken:         cfg.APIToken,
+			AllowedOrigins:   cfg.AllowedOrigins,
 		}).Router(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

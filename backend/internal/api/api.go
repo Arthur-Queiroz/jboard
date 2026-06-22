@@ -20,6 +20,9 @@ type Server struct {
 	Reminders        repository.ReminderRepository
 	DefaultRecipient string
 	APIToken         string
+	// AllowedOrigins é a allowlist de CORS (ver corsMiddleware). Vazia = nenhum
+	// header de CORS é emitido (comportamento same-origin padrão).
+	AllowedOrigins []string
 }
 
 func (s *Server) Router() http.Handler {
@@ -27,6 +30,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(s.corsMiddleware)
 	r.Use(s.authMiddleware)
 
 	r.Get("/api/health", s.health)

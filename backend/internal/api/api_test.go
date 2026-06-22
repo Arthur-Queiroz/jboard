@@ -196,6 +196,52 @@ func TestCreateCard_RemindersIsArray(t *testing.T) {
 	}
 }
 
+// TestCORS_PreflightAllowedOrigin: o webview do desktop manda um preflight OPTIONS
+// com Origin tauri://localhost; o backend deve responder 204 com os headers de CORS
+// ecoando a origem, sem passar pela auth.
+func TestCORS_PreflightAllowedOrigin(t *testing.T) {
+	srv := &Server{
+		Boards:         newFakeStore(),
+		Columns:        nil,
+		Cards:          nil,
+		Reminders:      nil,
+		APIToken:       "segredo", // auth ligada: o preflight não pode esbarrar nela
+		AllowedOrigins: []string{"tauri://localhost"},
+	}
+	h := srv.Router()
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/boards", nil)
+	req.Header.Set("Origin", "tauri://localhost")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("preflight: esperado 204, veio %d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "tauri://localhost" {
+		t.Fatalf("Allow-Origin: esperado tauri://localhost, veio %q", got)
+	}
+	if !strings.Contains(rec.Header().Get("Access-Control-Allow-Headers"), "Authorization") {
+		t.Fatalf("Allow-Headers deveria incluir Authorization, veio %q", rec.Header().Get("Access-Control-Allow-Headers"))
+	}
+}
+
+// TestCORS_DisallowedOrigin: origem fora da allowlist não recebe header de CORS.
+func TestCORS_DisallowedOrigin(t *testing.T) {
+	srv := &Server{Boards: newFakeStore(), AllowedOrigins: []string{"tauri://localhost"}}
+	h := srv.Router()
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/boards", nil)
+	req.Header.Set("Origin", "https://evil.example.com")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("origem não-permitida não deveria receber Allow-Origin, veio %q", got)
+	}
+}
+
 // utoa evita importar strconv só pra converter uint pra string no path.
 func utoa(id uint) string {
 	if id == 0 {
