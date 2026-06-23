@@ -154,14 +154,14 @@ múltiplas instâncias do backend.
   # proxy nem backend na própria origem, então a API base precisa ser absoluta):
   cd frontend && \
     VITE_JBOARD_API_BASE=https://jboard.devarthur.com.br/api \
-    VITE_JBOARD_API_TOKEN=<token> \
     npm run tauri:build
   ```
-  As `VITE_*` são lidas pelo `beforeBuildCommand` (`npm run build`) do
-  `tauri.conf.json`. Em `tauri:dev` a API base cai no default `/api` (proxy do
-  Vite → backend local). O backend precisa liberar a origem do webview em
-  `JBOARD_CORS_ORIGINS` (default já cobre `tauri://localhost` e
-  `http://tauri.localhost`).
+  `VITE_JBOARD_API_BASE` é lida pelo `beforeBuildCommand` (`npm run build`). **Não
+  embute token**: o desktop faz **login com senha** (igual à web) e, por ser
+  cross-origin, guarda o token de sessão devolvido no corpo do `/api/login`
+  (`want_token`) pra mandar como Bearer. O backend libera a origem do webview em
+  `JBOARD_CORS_ORIGINS` (default cobre `tauri://localhost` e `http://tauri.localhost`).
+  Passo a passo do build Windows em `docs/desktop-windows.md`.
 - **Deploy.** Ingress só via Cloudflare Tunnel → `web` (Caddy) em `127.0.0.1:8084`.
   Não abrir portas na VPS: no `docker-compose.prod.yml` só o `web` bind (loopback);
   postgres e backend ficam na rede interna. Subir com

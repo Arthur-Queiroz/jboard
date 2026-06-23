@@ -29,9 +29,9 @@ cd frontend && npm install && npm run dev
 
 # Desktop (do frontend/) — dev abre janela com hot reload (API base = /api local)
 npm run tauri:dev
-# Release: o webview empacotado precisa da API base absoluta (sem proxy próprio)
-VITE_JBOARD_API_BASE=https://jboard.devarthur.com.br/api \
-  VITE_JBOARD_API_TOKEN=<token> npm run tauri:build
+# Release: webview empacotado usa API base absoluta + login por senha (sem token
+# no bundle). Build nativo Windows: docs/desktop-windows.md
+VITE_JBOARD_API_BASE=https://jboard.devarthur.com.br/api npm run tauri:build
 ```
 
 **Verificação antes de finalizar qualquer alteração** (rode sempre):

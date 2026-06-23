@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // authServer monta um Server com auth ligada (APIToken não-vazio).
@@ -140,6 +141,46 @@ func TestLogin_SemSenhaConfigurada_401(t *testing.T) {
 	rec := doRequest(t, authServer(), http.MethodPost, "/api/login", map[string]string{"password": "qualquer"})
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("esperado 401 sem senha configurada, veio %d", rec.Code)
+	}
+}
+
+// TestSessionComoBearer_Autoriza: o desktop manda o token de sessão como Bearer
+// (é cross-origin, não usa cookie). authorized deve aceitar.
+func TestSessionComoBearer_Autoriza(t *testing.T) {
+	store := newFakeStore()
+	srv := &Server{Boards: store, Columns: store, Cards: store, Reminders: store, APIToken: "segredo", AuthPassword: "x"}
+	h := srv.Router()
+
+	bearer := mintSession("segredo", time.Now())
+	req := httptest.NewRequest(http.MethodGet, "/api/boards", nil)
+	req.Header.Set("Authorization", "Bearer "+bearer)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("token de sessão como Bearer deveria autorizar, veio %d", rec.Code)
+	}
+}
+
+// TestLogin_WantToken_DevolveToken: com want_token, a resposta inclui o token de
+// sessão (pro desktop); sem ele, não inclui (web usa só o cookie).
+func TestLogin_WantToken_DevolveToken(t *testing.T) {
+	h := authServerComSenha()
+
+	rec := doRequest(t, h, http.MethodPost, "/api/login", map[string]any{"password": "minhasenha", "want_token": true})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login: %d", rec.Code)
+	}
+	got := decodeBody[map[string]string](t, rec)
+	if got["token"] == "" {
+		t.Fatal("want_token=true deveria devolver token no corpo")
+	}
+	if !validSession("segredo", got["token"], time.Now()) {
+		t.Fatal("token devolvido deveria ser uma sessão válida")
+	}
+
+	rec2 := doRequest(t, h, http.MethodPost, "/api/login", map[string]any{"password": "minhasenha"})
+	if decodeBody[map[string]string](t, rec2)["token"] != "" {
+		t.Fatal("sem want_token, não deveria devolver token (web usa cookie)")
 	}
 }
 
