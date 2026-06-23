@@ -56,12 +56,25 @@ const BASE = import.meta.env.VITE_JBOARD_API_BASE ?? '/api'
 // Em dev local (token vazio no backend), fica undefined e o header não é enviado.
 const apiToken = import.meta.env.VITE_JBOARD_API_TOKEN as string | undefined
 
+// UnauthorizedError sinaliza 401 — a web usa pra mostrar a tela de login.
+export class UnauthorizedError extends Error {
+  constructor() {
+    super('não autenticado')
+    this.name = 'UnauthorizedError'
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  // Desktop manda Bearer (token no build); a web não tem token e autentica por
+  // cookie de sessão (mesma origem → enviado automaticamente).
   if (apiToken) {
     headers['Authorization'] = `Bearer ${apiToken}`
   }
   const res = await fetch(`${BASE}${path}`, { headers, ...init })
+  if (res.status === 401) {
+    throw new UnauthorizedError()
+  }
   if (!res.ok) {
     throw new Error(`${res.status} ${await res.text()}`)
   }
@@ -113,4 +126,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ reminder_at: reminderAt, message, recipient }),
     }),
+
+  // Login da web: troca a senha por um cookie de sessão httpOnly.
+  login: (password: string) =>
+    request<void>('/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  logout: () => request<void>('/logout', { method: 'POST' }),
 }

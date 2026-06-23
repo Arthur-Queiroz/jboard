@@ -1,56 +1,93 @@
 package api
 
 import (
-	"context"
 	"crypto/subtle"
 	"net/http"
 	"strings"
-
-	"github.com/go-chi/chi/v5/middleware"
+	"time"
 )
 
-// authMiddleware valida o header Authorization: Bearer <token> contra o token
-// configurado. Se o token env estiver vazio (dev local), o middleware é no-op.
-// /api/health é sempre público (liveness probe).
+// rotas sempre públicas (não exigem auth): liveness e o fluxo de login.
+var publicPaths = map[string]bool{
+	"/api/health": true,
+	"/api/login":  true,
+	"/api/logout": true,
+}
+
+// authMiddleware autoriza um request se ele tiver um Bearer válido (desktop/
+// máquina) OU um cookie de sessão válido (web). Se o token env estiver vazio
+// (dev local), o middleware é no-op.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Dev local sem token configurado: auth desligada.
-		if s.APIToken == "" {
+		if s.APIToken == "" { // dev local: auth desligada
 			next.ServeHTTP(w, r)
 			return
 		}
-
-		// Health endpoint é público.
-		if r.URL.Path == "/api/health" {
+		if publicPaths[r.URL.Path] {
 			next.ServeHTTP(w, r)
 			return
 		}
-
-		provided := r.Header.Get("Authorization")
-		if !strings.HasPrefix(provided, "Bearer ") {
-			respondError(w, http.StatusUnauthorized, errMissingToken)
+		if s.authorized(r) {
+			next.ServeHTTP(w, r)
 			return
 		}
-		token := strings.TrimPrefix(provided, "Bearer ")
-
-		// subtle.ConstantTimeCompare evita timing attack na comparação do token.
-		if subtle.ConstantTimeCompare([]byte(token), []byte(s.APIToken)) != 1 {
-			respondError(w, http.StatusUnauthorized, errInvalidToken)
-			return
-		}
-
-		// Anexa o request ID do chi no contexto pra correlacionar logs.
-		ctx := context.WithValue(r.Context(), requestIDKey{}, middleware.GetReqID(r.Context()))
-		next.ServeHTTP(w, r.WithContext(ctx))
+		respondError(w, http.StatusUnauthorized, errInvalidToken)
 	})
 }
 
-type requestIDKey struct{}
+// authorized aceita Bearer (igual ao APIToken) OU cookie de sessão assinado.
+func (s *Server) authorized(r *http.Request) bool {
+	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
+		token := strings.TrimPrefix(h, "Bearer ")
+		if subtle.ConstantTimeCompare([]byte(token), []byte(s.APIToken)) == 1 {
+			return true
+		}
+	}
+	if c, err := r.Cookie(sessionCookieName); err == nil {
+		if validSession(s.APIToken, c.Value, time.Now()) {
+			return true
+		}
+	}
+	return false
+}
 
-var (
-	errMissingToken = &authError{"token de autenticação ausente"}
-	errInvalidToken = &authError{"token de autenticação inválido"}
-)
+// login troca a senha por um cookie de sessão httpOnly (web). O desktop não usa
+// isto — manda Bearer direto.
+func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		respondError(w, http.StatusBadRequest, err)
+		return
+	}
+	// Sem senha configurada ou senha errada → 401 (comparação constant-time).
+	if s.AuthPassword == "" || subtle.ConstantTimeCompare([]byte(body.Password), []byte(s.AuthPassword)) != 1 {
+		respondError(w, http.StatusUnauthorized, errInvalidToken)
+		return
+	}
+	s.setSessionCookie(w, mintSession(s.APIToken, time.Now()), int(sessionTTL.Seconds()))
+	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) logout(w http.ResponseWriter, _ *http.Request) {
+	s.setSessionCookie(w, "", -1) // expira o cookie
+	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) setSessionCookie(w http.ResponseWriter, value string, maxAge int) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true, // prod é HTTPS (Cloudflare); em dev a auth fica desligada
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   maxAge,
+	})
+}
+
+var errInvalidToken = &authError{"credencial de autenticação inválida"}
 
 type authError struct{ msg string }
 

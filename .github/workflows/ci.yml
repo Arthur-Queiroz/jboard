@@ -55,6 +55,7 @@ jobs:
       JBOARD_DB_PASSWORD: ci
       JBOARD_EVOLUTION_API_KEY: ci
       JBOARD_API_TOKEN: ci
+      JBOARD_AUTH_PASSWORD: ci
     steps:
       - uses: actions/checkout@v7
       - run: docker compose -f infra/docker-compose.prod.yml build

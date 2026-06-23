@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from './api'
+import { api, UnauthorizedError } from './api'
 
 // Mocka o fetch global pra inspecionar URL/método/headers/corpo sem rede.
 function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
@@ -61,5 +61,19 @@ describe('api client', () => {
   it('resposta não-ok vira erro com status e corpo', async () => {
     mockFetch({ ok: false, status: 500, text: async () => 'boom' })
     await expect(api.listBoards()).rejects.toThrow('500 boom')
+  })
+
+  it('401 vira UnauthorizedError (pra disparar a tela de login)', async () => {
+    mockFetch({ ok: false, status: 401, text: async () => '' })
+    await expect(api.listBoards()).rejects.toBeInstanceOf(UnauthorizedError)
+  })
+
+  it('login faz POST /login com a senha', async () => {
+    const fetchMock = mockFetch({ status: 200, json: async () => ({ status: 'ok' }) })
+    await api.login('minhasenha')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/login')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ password: 'minhasenha' })
   })
 })

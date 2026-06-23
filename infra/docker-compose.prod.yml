@@ -50,8 +50,12 @@ services:
       JBOARD_EVOLUTION_INSTANCE: ${JBOARD_EVOLUTION_INSTANCE:-inspire}
       JBOARD_EVOLUTION_API_KEY: ${JBOARD_EVOLUTION_API_KEY:?defina JBOARD_EVOLUTION_API_KEY no infra/.env}
       JBOARD_WHATSAPP_RECIPIENT: ${JBOARD_WHATSAPP_RECIPIENT:-}
-      # Em produção o token NÃO pode ser vazio (vazio = auth desligada).
+      # Em produção o token NÃO pode ser vazio (vazio = auth desligada). É o
+      # Bearer do desktop e a chave que assina o cookie de sessão da web.
       JBOARD_API_TOKEN: ${JBOARD_API_TOKEN:?defina JBOARD_API_TOKEN no infra/.env}
+      # Senha do login da web (cookie de sessão). Obrigatória em prod, senão a
+      # web fica sem como autenticar (o token saiu do bundle).
+      JBOARD_AUTH_PASSWORD: ${JBOARD_AUTH_PASSWORD:?defina JBOARD_AUTH_PASSWORD no infra/.env}
     networks:
       - default
       - evolution
@@ -64,9 +68,8 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.web
-      args:
-        # Mesmo token do backend: o SPA o envia em Authorization: Bearer.
-        VITE_JBOARD_API_TOKEN: ${JBOARD_API_TOKEN:?defina JBOARD_API_TOKEN no infra/.env}
+      # Sem VITE_JBOARD_API_TOKEN: o SPA NÃO embute token (autentica por cookie
+      # de sessão via /api/login). Isso fecha a lacuna do token exposto no bundle.
     ports:
       # Loopback só: o cloudflared (na VPS) alcança; a internet não.
       - "127.0.0.1:8084:80"

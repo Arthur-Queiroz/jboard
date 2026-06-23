@@ -28,9 +28,13 @@ type Config struct {
 	WhatsAppRecipient string
 
 	// APIToken protege a API REST em deploy público. Vazio = auth desligada
-	// (dev local). Em produção, o frontend envia o token no header
-	// Authorization: Bearer <token>.
+	// (dev local). É o token Bearer do desktop e também a chave HMAC que assina
+	// o cookie de sessão da web.
 	APIToken string
+
+	// AuthPassword é a senha do login da web (troca o token-no-bundle por uma
+	// sessão em cookie httpOnly). Vazio = login por senha desligado (só Bearer).
+	AuthPassword string
 
 	// AllowedOrigins é a allowlist de CORS. A web e o desktop em dev falam com a
 	// API na mesma origem (proxy do Vite / Caddy), então não precisam de CORS; só
@@ -53,6 +57,7 @@ func Load() (Config, error) {
 		EvolutionAPIKey:   envStr("JBOARD_EVOLUTION_API_KEY", ""),
 		WhatsAppRecipient: envStr("JBOARD_WHATSAPP_RECIPIENT", ""),
 		APIToken:          envStr("JBOARD_API_TOKEN", ""),
+		AuthPassword:      envStr("JBOARD_AUTH_PASSWORD", ""),
 		AllowedOrigins:    envStrSlice("JBOARD_CORS_ORIGINS", "tauri://localhost,http://tauri.localhost"),
 	}
 	if cfg.DBPassword == "" {
