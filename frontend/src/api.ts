@@ -50,13 +50,18 @@ export interface BoardSummary {
 // produção). O build do desktop empacotado define VITE_JBOARD_API_BASE com a URL
 // absoluta do backend (ex.: https://jboard.devarthur.com.br/api), já que o webview
 // não tem proxy nem backend na própria origem. Sem barra final.
-const BASE = import.meta.env.VITE_JBOARD_API_BASE ?? '/api'
+const apiBase = import.meta.env.VITE_JBOARD_API_BASE as string | undefined
+const BASE = apiBase ?? '/api'
 
-// Token de auth injetado em produção via Vite env (VITE_JBOARD_API_TOKEN).
-// Em dev local (token vazio no backend), fica undefined e o header não é enviado.
-const apiToken = import.meta.env.VITE_JBOARD_API_TOKEN as string | undefined
+// O build do desktop define VITE_JBOARD_API_BASE (URL absoluta). Como ele é
+// cross-origin, não dá pra usar cookie (SameSite); então o login devolve o token
+// de sessão no corpo, guardamos localmente e mandamos como Bearer. A web (mesma
+// origem) usa o cookie httpOnly e não guarda token nenhum no JS.
+const isDesktop = !!apiBase
+const TOKEN_KEY = 'jboard-token'
+const storedToken = () => (isDesktop ? localStorage.getItem(TOKEN_KEY) : null)
 
-// UnauthorizedError sinaliza 401 — a web usa pra mostrar a tela de login.
+// UnauthorizedError sinaliza 401 — dispara a tela de login (web e desktop).
 export class UnauthorizedError extends Error {
   constructor() {
     super('não autenticado')
@@ -66,10 +71,9 @@ export class UnauthorizedError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  // Desktop manda Bearer (token no build); a web não tem token e autentica por
-  // cookie de sessão (mesma origem → enviado automaticamente).
-  if (apiToken) {
-    headers['Authorization'] = `Bearer ${apiToken}`
+  const token = storedToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
   }
   const res = await fetch(`${BASE}${path}`, { headers, ...init })
   if (res.status === 401) {
@@ -127,8 +131,19 @@ export const api = {
       body: JSON.stringify({ reminder_at: reminderAt, message, recipient }),
     }),
 
-  // Login da web: troca a senha por um cookie de sessão httpOnly.
-  login: (password: string) =>
-    request<void>('/login', { method: 'POST', body: JSON.stringify({ password }) }),
-  logout: () => request<void>('/logout', { method: 'POST' }),
+  // Login: web recebe cookie httpOnly; desktop pede o token (want_token) e o
+  // guarda pra mandar como Bearer nas próximas requests.
+  login: async (password: string) => {
+    const res = await request<{ token?: string }>('/login', {
+      method: 'POST',
+      body: JSON.stringify({ password, want_token: isDesktop }),
+    })
+    if (isDesktop && res?.token) {
+      localStorage.setItem(TOKEN_KEY, res.token)
+    }
+  },
+  logout: async () => {
+    if (isDesktop) localStorage.removeItem(TOKEN_KEY)
+    await request<void>('/logout', { method: 'POST' })
+  },
 }

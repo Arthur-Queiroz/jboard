@@ -35,11 +35,16 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// authorized aceita Bearer (igual ao APIToken) OU cookie de sessão assinado.
+// authorized aceita, em ordem: Bearer igual ao APIToken (máquina/scripts), Bearer
+// com um token de sessão assinado (desktop, que é cross-origin e não usa cookie),
+// ou o cookie de sessão (web, mesma origem).
 func (s *Server) authorized(r *http.Request) bool {
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		token := strings.TrimPrefix(h, "Bearer ")
 		if subtle.ConstantTimeCompare([]byte(token), []byte(s.APIToken)) == 1 {
+			return true
+		}
+		if validSession(s.APIToken, token, time.Now()) {
 			return true
 		}
 	}
@@ -55,7 +60,8 @@ func (s *Server) authorized(r *http.Request) bool {
 // isto — manda Bearer direto.
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Password string `json:"password"`
+		Password  string `json:"password"`
+		WantToken bool   `json:"want_token"` // desktop (cross-origin) pede o token p/ Bearer
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		respondError(w, http.StatusBadRequest, err)
@@ -66,8 +72,14 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, errInvalidToken)
 		return
 	}
-	s.setSessionCookie(w, mintSession(s.APIToken, time.Now()), int(sessionTTL.Seconds()))
-	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	session := mintSession(s.APIToken, time.Now())
+	s.setSessionCookie(w, session, int(sessionTTL.Seconds()))
+	resp := map[string]string{"status": "ok"}
+	if body.WantToken {
+		// Só devolve o token quando pedido (desktop), pra não expor no JS da web.
+		resp["token"] = session
+	}
+	respondJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) logout(w http.ResponseWriter, _ *http.Request) {

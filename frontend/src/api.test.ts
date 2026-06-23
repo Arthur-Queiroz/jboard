@@ -68,12 +68,13 @@ describe('api client', () => {
     await expect(api.listBoards()).rejects.toBeInstanceOf(UnauthorizedError)
   })
 
-  it('login faz POST /login com a senha', async () => {
+  it('login faz POST /login com a senha (web: want_token false)', async () => {
     const fetchMock = mockFetch({ status: 200, json: async () => ({ status: 'ok' }) })
     await api.login('minhasenha')
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/login')
     expect(init.method).toBe('POST')
-    expect(JSON.parse(init.body)).toEqual({ password: 'minhasenha' })
+    // No ambiente de teste não há VITE_JBOARD_API_BASE → modo web (want_token false).
+    expect(JSON.parse(init.body)).toEqual({ password: 'minhasenha', want_token: false })
   })
 })
