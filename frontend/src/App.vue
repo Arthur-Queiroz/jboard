@@ -11,6 +11,19 @@ const editingBoardTitle = ref('')
 const error = ref('')
 const loading = ref(false)
 
+// Tema dark/light persistido em localStorage; aplicado via data-theme no <html>.
+const theme = ref<'dark' | 'light'>(
+  (localStorage.getItem('jboard-theme') as 'dark' | 'light') || 'dark',
+)
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', theme.value)
+}
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  localStorage.setItem('jboard-theme', theme.value)
+  applyTheme()
+}
+
 // Login (web): quando a API responde 401, mostra a tela de senha.
 const needLogin = ref(false)
 const password = ref('')
@@ -123,28 +136,41 @@ async function reloadSelected() {
   if (selected.value) await selectBoard(selected.value.id)
 }
 
-onMounted(loadBoards)
+onMounted(() => {
+  applyTheme()
+  loadBoards()
+})
 </script>
 
 <template>
+  <!-- Login (web): a SPA não tem token; autentica por senha → cookie de sessão. -->
   <div v-if="needLogin" class="login">
     <form class="login-card" @submit.prevent="doLogin">
-      <h1>jboard</h1>
+      <div class="login-brand">
+        <div class="brand-mark">j</div>
+        <span class="brand-name">board</span>
+      </div>
       <input
         v-model="password"
+        class="field"
         type="password"
         placeholder="senha"
-        autofocus
         autocomplete="current-password"
       />
-      <button type="submit" :disabled="loggingIn">{{ loggingIn ? 'entrando…' : 'entrar' }}</button>
+      <button type="submit" class="btn-accent" :disabled="loggingIn">
+        {{ loggingIn ? 'entrando…' : 'entrar' }}
+      </button>
       <p v-if="loginError" class="error">{{ loginError }}</p>
     </form>
   </div>
 
   <div v-else class="app">
     <div class="topbar">
-      <h1>jboard</h1>
+      <div class="brand">
+        <div class="brand-mark">j</div>
+        <span class="brand-name">board</span>
+      </div>
+
       <div class="boards">
         <button
           v-for="board in boards"
@@ -156,14 +182,55 @@ onMounted(loadBoards)
           {{ board.title }}
         </button>
       </div>
-      <input v-model="newBoardTitle" placeholder="novo quadro" @keyup.enter="addBoard" />
-      <button @click="addBoard">+</button>
-      <button class="logout" @click="logout" title="sair">sair</button>
+
+      <div class="topbar-actions">
+        <input
+          v-model="newBoardTitle"
+          class="field field-board"
+          placeholder="novo quadro"
+          @keyup.enter="addBoard"
+        />
+        <button class="primary-btn" title="Criar quadro" @click="addBoard">+</button>
+
+        <button class="icon-btn" title="Alternar tema" @click="toggleTheme">
+          <svg
+            v-if="theme === 'dark'"
+            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          >
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+          </svg>
+          <svg
+            v-else
+            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4" />
+          </svg>
+        </button>
+
+        <button class="icon-btn" title="Sair" @click="logout">
+          <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <div v-if="selected" class="subbar">
-      <input v-model="editingBoardTitle" @keyup.enter="renameBoard" @blur="renameBoard" />
-      <button @click="removeBoard(selected.id)" class="danger">excluir quadro</button>
+      <input
+        v-model="editingBoardTitle"
+        class="field"
+        @keyup.enter="renameBoard"
+        @blur="renameBoard"
+      />
+      <button class="danger-btn" @click="removeBoard(selected.id)">excluir quadro</button>
     </div>
 
     <div v-if="error" class="error">{{ error }}</div>
@@ -178,7 +245,7 @@ onMounted(loadBoards)
           :column="column"
           @changed="reloadSelected"
         />
-        <div class="column add-column">
+        <div class="add-column">
           <div class="add-form">
             <input v-model="newColumnTitle" placeholder="nova coluna" @keyup.enter="addColumn" />
             <button @click="addColumn">+</button>
