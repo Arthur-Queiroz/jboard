@@ -56,13 +56,13 @@ function mountColumn(column = makeColumn()) {
 describe('ColumnView', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('renderiza título da coluna, card e chip de lembrete (prefixo wa)', () => {
+  it('renderiza título da coluna, card e chip de lembrete (data formatada)', () => {
     const wrapper = mountColumn()
     expect(wrapper.find('h3').text()).toBe('A fazer')
     expect(wrapper.find('.card-title').text()).toBe('Estudar Go')
     const chip = wrapper.find('.reminder-chip')
     expect(chip.exists()).toBe(true)
-    expect(chip.text()).toContain('wa')
+    expect(chip.text()).toMatch(/\d/) // mostra a data formatada (ícone WA + data)
     // pendente (sent_at null) → sem classe .sent
     expect(chip.classes()).not.toContain('sent')
   })

@@ -101,7 +101,7 @@ function toggleReminder(cardId: number) {
 }
 
 async function addReminder(cardId: number) {
-  if (!reminderAt.value || !reminderMessage.value.trim()) return
+  if (!reminderAt.value) return
   await api.createReminder(
     cardId,
     new Date(reminderAt.value).toISOString(),
@@ -116,20 +116,21 @@ async function addReminder(cardId: number) {
 function formatReminder(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
+
+// Path do ícone do WhatsApp (reutilizado no chip e no botão).
+const WA_PATH =
+  'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20zm4.4-5.9c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.8 1-.3.1-.5 0a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2a.4.4 0 0 0 0-.4l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5a.9.9 0 0 0-.7.3 2.8 2.8 0 0 0-.9 2.1 5 5 0 0 0 1 2.6 11 11 0 0 0 4.3 3.8c1.6.6 1.9.5 2.3.5a2.4 2.4 0 0 0 1.6-1.1 2 2 0 0 0 .1-1.1c0-.1-.2-.2-.4-.3z'
 </script>
 
 <template>
   <section class="column">
-    <header>
-      <h3 v-if="!editingColumn" @dblclick="startEditColumn">{{ column.title }}</h3>
-      <input
-        v-else
-        v-model="columnTitleDraft"
-        @keyup.enter="saveColumn"
-        @blur="saveColumn"
-      />
-      <button class="danger" @click="removeColumn">×</button>
-    </header>
+    <div class="column-header">
+      <h3 v-if="!editingColumn" title="clique duplo para renomear" @dblclick="startEditColumn">
+        {{ column.title }}
+      </h3>
+      <input v-else v-model="columnTitleDraft" @keyup.enter="saveColumn" @blur="saveColumn" />
+      <button class="col-delete" title="excluir coluna" @click="removeColumn">×</button>
+    </div>
 
     <VueDraggable
       v-model="column.cards"
@@ -137,25 +138,30 @@ function formatReminder(iso: string): string {
       item-key="id"
       class="cards"
       :animation="150"
+      chosen-class="card-dragging"
       @update="persistOrder"
       @add="persistOrder"
       @remove="persistOrder"
     >
       <div v-for="card in column.cards" :key="card.id" class="card">
-        <template v-if="editingCardId === card.id">
-          <input v-model="cardDraftTitle" @keyup.enter="saveCard(card)" />
-          <textarea v-model="cardDraftDescription" rows="2" placeholder="descrição"></textarea>
-          <div class="card-actions">
-            <button @click="saveCard(card)">salvar</button>
-            <button @click="editingCardId = null">cancelar</button>
+        <div v-if="editingCardId === card.id" class="card-edit">
+          <input v-model="cardDraftTitle" placeholder="título" @keyup.enter="saveCard(card)" />
+          <textarea v-model="cardDraftDescription" rows="2" placeholder="descrição" />
+          <div class="form-actions">
+            <button class="btn-accent" @click="saveCard(card)">salvar</button>
+            <button class="btn-ghost" @click="editingCardId = null">cancelar</button>
           </div>
-        </template>
+        </div>
+
         <template v-else>
-          <div class="title">
+          <div class="card-head">
             <span class="card-title" @click="startEditCard(card)">{{ card.title }}</span>
-            <button class="danger" @click="removeCard(card.id)">×</button>
+            <button class="card-delete" @click="removeCard(card.id)">×</button>
           </div>
-          <p v-if="card.description" class="desc" @click="startEditCard(card)">{{ card.description }}</p>
+          <p v-if="card.description" class="card-desc" @click="startEditCard(card)">
+            {{ card.description }}
+          </p>
+
           <div v-if="card.reminders?.length" class="reminders">
             <span
               v-for="reminder in card.reminders"
@@ -164,18 +170,31 @@ function formatReminder(iso: string): string {
               :class="{ sent: reminder.sent_at }"
               :title="reminder.sent_at ? 'WhatsApp enviado' : 'WhatsApp agendado'"
             >
-              wa {{ formatReminder(reminder.reminder_at) }}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                <path :d="WA_PATH" />
+              </svg>
+              {{ formatReminder(reminder.reminder_at) }}
             </span>
           </div>
+
           <div class="card-actions">
-            <button @click="startEditCard(card)">editar</button>
-            <button @click="toggleReminder(card.id)">WhatsApp</button>
+            <button class="edit-btn" @click="startEditCard(card)">editar</button>
+            <button class="wa-btn" @click="toggleReminder(card.id)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <path :d="WA_PATH" />
+              </svg>
+              WhatsApp
+            </button>
           </div>
+
           <div v-if="openReminderFor === card.id" class="reminder-form">
-            <label class="reminder-label">Enviar pelo WhatsApp em:</label>
+            <span class="reminder-label">Enviar pelo WhatsApp em:</span>
             <input type="datetime-local" v-model="reminderAt" />
-            <textarea v-model="reminderMessage" placeholder="mensagem do WhatsApp" rows="2" />
-            <button @click="addReminder(card.id)">agendar envio</button>
+            <textarea v-model="reminderMessage" placeholder="Mensagem (opcional)" rows="2" />
+            <div class="form-actions">
+              <button class="btn-wa" @click="addReminder(card.id)">agendar envio</button>
+              <button class="btn-ghost" @click="toggleReminder(card.id)">cancelar</button>
+            </div>
           </div>
         </template>
       </div>
@@ -183,7 +202,7 @@ function formatReminder(iso: string): string {
 
     <div class="add-form">
       <input v-model="newCardTitle" placeholder="novo card" @keyup.enter="addCard" />
-      <button @click="addCard">+</button>
+      <button title="adicionar card" @click="addCard">+</button>
     </div>
   </section>
 </template>
