@@ -221,16 +221,7 @@ npm run tauri:dev
 
 ---
 
-## 4. Deploy produção (Fase 5 — futuro)
+## 4. Deploy produção
 
-Resumo do que vai precisar quando for pra VPS:
-
-1. **Kamal 2**: `config/deploy.yml` espelhando o jblog (accessory Postgres dedicado,
-   registry ghcr.io, Cloudflare Tunnel ingress)
-2. **Caddy**: roteia `jboard.devarthur.com.br` (SPA) e `jboard-api.devarthur.com.br` (API)
-3. **Evolution API**: accessory ou serviço Docker separado na VPS, com Redis
-4. **Cloudflare Tunnel**: 2 subdomínios apontando pro Caddy na KVM2
-5. **Auth**: `JBOARD_API_TOKEN` não-vazio no env do backend + `VITE_JBOARD_API_TOKEN`
-   injetado no build do frontend
-
-Isso será implementado quando você estiver pronto pra migrar pra VPS.
+O deploy de produção atual usa Docker Compose + Caddy + Cloudflare Tunnel na VPS.
+O runbook canônico fica em `docs/deploy.md`.

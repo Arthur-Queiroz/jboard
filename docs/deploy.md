@@ -42,7 +42,7 @@ mexer.
 Repo precisa estar no GitHub (público, ou com deploy key se privado). Na VPS:
 
 ```bash
-ssh root@2.25.158.85
+ssh root@187.127.34.186
 git clone https://github.com/Arthur-Queiroz/jboard /opt/jboard
 cd /opt/jboard
 ```
