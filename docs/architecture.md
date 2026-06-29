@@ -18,7 +18,7 @@ App de gestão pessoal pra substituir Notion/Trello, que não funcionaram na pr�
 | Backend | Go + GORM + chi | API REST, scheduler de lembretes, integração WhatsApp |
 | Banco | Postgres (instância dedicada) | Persistência de boards/cards/reminders |
 | WhatsApp | Evolution API (self-hosted) | Envio de mensagens via WhatsApp não-oficial |
-| Deploy | Docker + Kamal 2 + Caddy + Cloudflare Tunnel | Hospedagem na Hostinger KVM2 |
+| Deploy | Docker Compose + Caddy + Cloudflare Tunnel | Hospedagem na Hostinger KVM2 |
 
 A motivação de testar Rust foi o ponto de partida da escolha do Tauri — o objetivo explícito é aprender Rust na prática, sem precisar reescrever toda a lógica de negócio: o Rust fica restrito à camada nativa do desktop (tray icon, notificações, autostart), enquanto toda a lógica de produto vive no backend Go e na UI Vue.
 
@@ -42,7 +42,7 @@ Como os critérios 1, 2 e 3 já pendem pro Postgres, e são os de maior peso na 
 
 ### Por que instância dedicada (e não compartilhada com o jblog)
 
-Embora reaproveitar a instância de Postgres do jblog (que já roda via Kamal 2 na KVM2 atual) reduzisse a infraestrutura nova necessária, a decisão final foi por uma instância dedicada — motivada pela migração planejada da VPS para uma KVM2 nova (Brasil, custo menor) após o dia 25. Isolar o banco agora evita ter que desentrelaçar dump/restore de dois projetos na hora da migração; o jboard pode ser movido independentemente do jblog.
+Embora reaproveitar a instância de Postgres de outro projeto reduzisse a infraestrutura nova necessária, a decisão final foi por uma instância dedicada. Isolar o banco mantém o jboard independente nas migrações de VPS e evita entrelaçar dump/restore de projetos diferentes.
 
 ## Por que não Redis
 

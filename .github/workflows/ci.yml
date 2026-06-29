@@ -99,7 +99,7 @@ jobs:
           mkdir -p ~/.ssh
           cat >> ~/.ssh/config <<'EOF'
           Host vps
-            HostName 2.25.158.85
+            HostName 187.127.34.186
             User root
             ProxyCommand cloudflared access ssh --hostname ssh.devarthur.com.br
             StrictHostKeyChecking accept-new
